@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<title>Pong con niveles</title>
+<style>
+  body {
+    background: black;
+    color: white;
+    font-family: Arial, sans-serif;
+    text-align: center;
+    margin: 0;
+    overflow: hidden;
+  }
+  canvas {
+    background: #222;
+    display: block;
+    margin: 20px auto;
+    border: 2px solid white;
+  }
+</style>
+</head>
+<body>
+
+<h1>Pong con Niveles</h1>
+<canvas id="pong" width="600" height="400"></canvas>
+<p id="score">Jugador: 0 | CPU: 0 | Nivel: 1</p>
+<p>Usa flechas ↑ ↓ para mover la paleta</p>
+
+<script>
+(() => {
+  const canvas = document.getElementById('pong');
+  const ctx = canvas.getContext('2d');
+
+  const ancho = canvas.width;
+  const alto = canvas.height;
+
+  // Paletas
+  const paletaAltura = 80;
+  const paletaAncho = 10;
+  let jugadorY = alto / 2 - paletaAltura / 2;
+  let cpuY = alto / 2 - paletaAltura / 2;
+
+  // Pelota
+  let pelotaX = ancho / 2;
+  let pelotaY = alto / 2;
+  let pelotaRadio = 8;
+
+  // Velocidad inicial de la pelota
+  let velocidadX = 4;
+  let velocidadY = 4;
+
+  // Puntuación y nivel
+  let puntJugador = 0;
+  let puntCPU = 0;
+  let nivel = 1;
+
+  // Velocidad de la paleta del jugador
+  const paletaVelocidad = 7;
+
+  // Control teclado
+  const teclas = {
+    arriba: false,
+    abajo: false,
+  };
+
+  // Evento teclado
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowUp') teclas.arriba = true;
+    if (e.key === 'ArrowDown') teclas.abajo = true;
+  });
+  document.addEventListener('keyup', (e) => {
+    if (e.key === 'ArrowUp') teclas.arriba = false;
+    if (e.key === 'ArrowDown') teclas.abajo = false;
+  });
+
+  // Actualiza posición de la paleta jugador
+  function moverPaletaJugador() {
+    if (teclas.arriba) {
+      jugadorY -= paletaVelocidad;
+      if (jugadorY < 0) jugadorY = 0;
+    }
+    if (teclas.abajo) {
+      jugadorY += paletaVelocidad;
+      if (jugadorY + paletaAltura > alto) jugadorY = alto - paletaAltura;
+    }
+  }
+
+  // Mover paleta CPU (simple IA)
+  function moverPaletaCPU() {
+    const centroPaletaCPU = cpuY + paletaAltura / 2;
+    if (centroPaletaCPU < pelotaY - 10) {
+      cpuY += 5 + nivel; // más rápido en niveles altos
+      if (cpuY + paletaAltura > alto) cpuY = alto - paletaAltura;
+    } else if (centroPaletaCPU > pelotaY + 10) {
+      cpuY -= 5 + nivel;
+      if (cpuY < 0) cpuY = 0;
+    }
+  }
+
+  // Dibuja todo en el canvas
+  function dibujar() {
+    // Fondo
+    ctx.fillStyle = '#222';
+    ctx.fillRect(0, 0, ancho, alto);
+
+    // Paletas
+    ctx.fillStyle = 'white';
+    // Jugador (izquierda)
+    ctx.fillRect(10, jugadorY, paletaAncho, paletaAltura);
+    // CPU (derecha)
+    ctx.fillRect(ancho - 20, cpuY, paletaAncho, paletaAltura);
+
+    // Pelota
+    ctx.beginPath();
+    ctx.arc(pelotaX, pelotaY, pelotaRadio, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Línea central punteada
+    ctx.strokeStyle = 'white';
+    ctx.setLineDash([5, 15]);
+    ctx.beginPath();
+    ctx.moveTo(ancho / 2, 0);
+    ctx.lineTo(ancho / 2, alto);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // Actualiza la lógica del juego
+  function actualizar() {
+    // Mueve la pelota
+    pelotaX += velocidadX;
+    pelotaY += velocidadY;
+
+    // Rebote superior e inferior
+    if (pelotaY - pelotaRadio < 0 || pelotaY + pelotaRadio > alto) {
+      velocidadY = -velocidadY;
+    }
+
+    // Rebote con la paleta jugador
+    if (
+      pelotaX - pelotaRadio < 20 &&
+      pelotaY > jugadorY &&
+      pelotaY < jugadorY + paletaAltura
+    ) {
+      velocidadX = -velocidadX;
+      // Añade variación vertical dependiendo donde pegue
+      let impacto = pelotaY - (jugadorY + paletaAltura / 2);
+      velocidadY = impacto * 0.3;
+    }
+
+    // Rebote con la paleta CPU
+    if (
+      pelotaX + pelotaRadio > ancho - 20 &&
+      pelotaY > cpuY &&
+      pelotaY < cpuY + paletaAltura
+    ) {
+      velocidadX = -velocidadX;
+      let impacto = pelotaY - (cpuY + paletaAltura / 2);
+      velocidadY = impacto * 0.3;
+    }
+
+    // Punto para CPU
+    if (pelotaX < 0) {
+      puntCPU++;
+      resetPelota();
+    }
+
+    // Punto para jugador
+    if (pelotaX > ancho) {
+      puntJugador++;
+      resetPelota();
+    }
+
+    // Subir nivel cada 3 puntos del jugador
+    if (puntJugador > 0 && puntJugador % 3 === 0 && nivel < Math.floor(puntJugador / 3) + 1) {
+      nivel++;
+      velocidadX += (velocidadX > 0 ? 1 : -1);
+      velocidadY += (velocidadY > 0 ? 1 : -1);
+      // Aviso de nivel
+      alert('¡Nivel ' + nivel + '!');
+    }
+
+    // Actualizar paletas
+    moverPaletaJugador();
+    moverPaletaCPU();
+
+    // Actualizar puntuación y nivel en pantalla
+    document.getElementById('score').textContent = `Jugador: ${puntJugador} | CPU: ${puntCPU} | Nivel: ${nivel}`;
+  }
+
+  // Reiniciar la posición y velocidad de la pelota
+  function resetPelota() {
+    pelotaX = ancho / 2;
+    pelotaY = alto / 2;
+
+    // Velocidad aleatoria pero que siempre vaya hacia el que anotó punto
+    let direccion = (puntJugador > puntCPU) ? 1 : -1;
+    velocidadX = direccion * (4 + nivel - 1);
+    velocidadY = (Math.random() * 4) - 2; // entre -2 y 2
+  }
+
+  // Bucle principal
+  function loop() {
+    actualizar();
+    dibujar();
+    requestAnimationFrame(loop);
+  }
+
+  // Empezar juego
+  resetPelota();
+  loop();
+})();
+</script>
+
+</body>
+</html>
